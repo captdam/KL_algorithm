@@ -1,0 +1,200 @@
+<html>
+	<head>
+		<script src="./phasor.js"></script>
+		<script src="./kl.js"></script>
+		<script src="./htmlutil.js"></script>
+	</head>
+	<body>
+		<label>Select nodelist file: </label><input type="file" id="nodefile" /><br/>
+		<label>Select netlist file: </label><input type="file" id="netfile" /><br/>
+		<button onclick="main()">Process start!</button>
+		<p>Open web inspector to view log / debug info</p>
+		
+		<div>
+			<canvas id="bestCanvas"></canvas>
+			<canvas id="currentCanvas"></canvas>
+		</div>
+		
+		<script>
+
+document.getElementById('nodefile').onchange = () => {
+	fileReader(document.getElementById('nodefile').files[0]).then( x => {
+		window.nodesfile = x;
+		console.log('Get nodelist from file:\n '+x.substr(0,200));
+	} );
+};
+document.getElementById('netfile').onchange = () => {
+	fileReader(document.getElementById('netfile').files[0]).then( x => {
+		window.netsfile = x;
+		console.log('Get netlist from file:\n '+x.substr(0,200));
+	} );
+};
+
+function main() {
+	
+	// Design data structure - Solution of partitioning
+	var bestDesign = {
+		"groupA" : [],
+		"groupB" : [],
+		"interconnect" : 0,
+	}
+	var currentDesign = bestDesign;
+	
+	// 0 - Nodefile and netfile are ready when user load the files.
+	
+	// 1- Process the files, save nodes and nets in  array
+	var nodes = getNodes(window.nodesfile);
+	var edges = getEdges(window.netsfile);
+	console.log('Nodes:',nodes);
+	console.log('Edges:',edges);
+	
+	// 2 - Generate first grouping
+	for (var i = 0; i < nodes.length; i++) { //Split by even/odd index
+		if (i&1) currentDesign.groupA.push(nodes[i]);
+		else currentDesign.groupB.push(nodes[i]);
+	}
+//	currentDesign.interconnect = countInterConnect(currentDesign,edges);
+	console.log('Design 0:',currentDesign);
+	draw(currentDesign,edges);
+	
+	bestDesign = currentDesign;
+	updateBestCanvas();
+	
+/*	// KL greedy loop
+	do {
+		var exchange = [[],[]];
+		
+		//KL - find pairs of unlocked nodes which gives best result
+		for (var i = 0, i < design.groupA.length; i++) { //groupA has same or 1 less element then B
+			
+			//Search for best pair
+			var bestPair = [0,0,D(a0--b0)]; //Assume the first has best result
+			for (var a = 0; a < design.groupA.length; a++) {
+				for (var b = 0; b < design.groupB.length; b++) {
+					gain = D(a--b);
+					if ( gain > best[2] )
+						bestPair = [a,b,gain];
+				}
+			}
+			
+			
+		}
+		
+	} while (gain);
+*/	
+	console.log('Done! Best result shown below:');
+	console.log(bestDesign);
+	
+	
+}
+
+function draw(design,netlist) {
+
+	//Config
+	var canvasWidth = 800, canvasHeight = 600;
+	var groupAPos = [25,25], groupBPos = [475,25], groupSize = [300,550], groupMargin = 10;
+	
+	//Util
+	var drawNodeA = pos => {return [ pos[0] * groupSize[0] + groupAPos[0] , pos[1] * groupSize[1] + groupAPos[1] ];}
+	var drawNodeB = pos => {return [ pos[0] * groupSize[0] + groupBPos[0] , pos[1] * groupSize[1] + groupBPos[1] ];}
+	
+	//Init canvas
+	var canvas = document.getElementById('currentCanvas');
+	canvas.width = canvasWidth;
+	canvas.height = canvasHeight;
+	
+	var ctx = canvas.getContext('2d');
+	ctx.font = '12px Courier';
+	ctx.clearRect(0,0,800,600);
+	
+	//Reformat data structure for better for the draw util
+	var aNode = {}, bNode = {};
+	design.groupA.map( x => { aNode[x.name] = drawNodeA(x.pos); } );
+	design.groupB.map( x => { bNode[x.name] = drawNodeB(x.pos); } );
+	
+	//Draw nodes (draw circle/dot)
+	for (ai in aNode) {
+		ctx.beginPath();
+		ctx.arc(aNode[ai][0],aNode[ai][1],2,0,Math.PI*2); //x,y,r,startAngle,angle
+		ctx.stroke();
+		ctx.fillText(ai,aNode[ai][0]-5,aNode[ai][1]+10);
+	}
+	for (bi in bNode) {
+		ctx.beginPath();
+		ctx.arc(bNode[bi][0],bNode[bi][1],2,0,Math.PI*2); //x,y,r,startAngle,angle
+		ctx.stroke();
+		ctx.fillText(bi,bNode[bi][0]-5,bNode[bi][1]+10);
+	}
+	
+	//Draw edges (draw line)
+	netlist.map( edge => {
+		var r = getRandom(80,200);
+		var g = getRandom(80,200);
+		var b = getRandom(80,200);
+		ctx.strokeStyle = 'rgb('+r+','+g+','+b+')';
+		
+		if (edge.nodes.length > 2) { //Hyperedge, using hub
+			var hub = drawNodeA(edge.pos); //Assume all nodes in group A
+			if ( isInterConnect(design,edge) ) {
+				console.log('inter',edge);
+				hub[0] = canvasWidth / 2; //Inter-connect: Pos X should be horizontal center of canvas
+			}
+			else {
+				if ( aNode[edge.nodes[0]] ) {//If not inter-connect, node[0] gives the grouping for all nodes
+					hub = drawNodeB(edge.pos);
+					console.log('b',edge);
+				}
+			}
+			edge.nodes.map( x => {
+				ctx.beginPath();
+				ctx.moveTo(hub[0],hub[1]); //Start at hub position, then to the connected node
+				if (aNode[x]) ctx.lineTo(aNode[x][0],aNode[x][1]);
+				else ctx.lineTo(bNode[x][0],bNode[x][1]);
+				ctx.stroke();
+			} );
+		}
+		else { //Two node, directly connect
+			ctx.beginPath();
+			if (aNode[edge.nodes[0]])	ctx.moveTo(aNode[edge.nodes[0]][0],aNode[edge.nodes[0]][1]);
+			else				ctx.moveTo(bNode[edge.nodes[0]][0],bNode[edge.nodes[0]][1]);
+			if (aNode[edge.nodes[1]])	ctx.lineTo(aNode[edge.nodes[1]][0],aNode[edge.nodes[1]][1]);
+			else				ctx.lineTo(bNode[edge.nodes[1]][0],bNode[edge.nodes[1]][1]);
+			ctx.stroke();
+		}
+	} );
+	
+	//Draw misc
+	ctx.fillText('Cost = '+design.interconnect,2,10);
+	ctx.fillText('Zone A',groupAPos[0],canvasHeight-5);
+	ctx.fillText('Zone B',groupBPos[0],canvasHeight-5);
+	ctx.strokeStyle = '#DDDDDD';
+	ctx.strokeRect(groupAPos[0]-groupMargin,groupAPos[1]-groupMargin,groupSize[0]+2*groupMargin,groupSize[1]+2*groupMargin);
+	ctx.strokeRect(groupBPos[0]-groupMargin,groupBPos[1]-groupMargin,groupSize[0]+2*groupMargin,groupSize[1]+2*groupMargin);
+	ctx.beginPath();
+	ctx.moveTo(canvasWidth/2,groupMargin);
+	ctx.lineTo(canvasWidth/2,canvasHeight-groupMargin);
+	ctx.stroke();
+}
+
+function updateBestCanvas() {
+	var canvas = document.getElementById('bestCanvas');
+	var ctx = canvas.getContext('2d');
+	canvas.width = 800;
+	canvas.height = 600;
+	ctx.clearRect(0,0,800,600);
+	ctx.drawImage(document.getElementById('currentCanvas'),0,0);
+}
+		</script>
+		<style>
+
+canvas {
+	margin: 10px;
+	background-color: #F2F2F2;
+	width: 800px;
+	height: 600px;
+	display: inline-block;
+}
+
+		</style>
+	</body>
+</html>
