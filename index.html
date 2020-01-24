@@ -15,6 +15,7 @@
 			<canvas id="currentCanvas"></canvas>
 		</div>
 		
+		
 		<script>
 
 document.getElementById('nodefile').onchange = () => {
@@ -53,7 +54,7 @@ function main() {
 		if (i&1) currentDesign.groupA.push(nodes[i]);
 		else currentDesign.groupB.push(nodes[i]);
 	}
-//	currentDesign.interconnect = countInterConnect(currentDesign,edges);
+	getDIE(currentDesign,edges);
 	console.log('Design 0:',currentDesign);
 	draw(currentDesign,edges);
 	
@@ -63,6 +64,8 @@ function main() {
 /*	// KL greedy loop
 	do {
 		var exchange = [[],[]];
+		computer D value for all: D = E - I
+		var gv = [], av = [], bv = [];
 		
 		//KL - find pairs of unlocked nodes which gives best result
 		for (var i = 0, i < design.groupA.length; i++) { //groupA has same or 1 less element then B
@@ -136,7 +139,6 @@ function draw(design,netlist) {
 		if (edge.nodes.length > 2) { //Hyperedge, using hub
 			var hub = drawNodeA(edge.pos); //Assume all nodes in group A
 			if ( isInterConnect(design,edge) ) {
-				console.log('inter',edge);
 				hub[0] = canvasWidth / 2; //Inter-connect: Pos X should be horizontal center of canvas
 			}
 			else {
@@ -196,5 +198,43 @@ canvas {
 }
 
 		</style>
+		
+		<span id="debugNodes" style="display:none;">
+UCLA nodes 1.0 
+
+NumNodes :              7
+NumTerminals :            4
+p1 terminal
+p2 terminal
+p3 terminal
+p4 terminal
+p5 terminal
+p6 terminal
+a0
+		</span>
+		<span id="debugNets" style="display:none;">
+UCLA nets 1.0
+
+NumPins : 4
+NetDegree : 2
+p1 B
+a0 B
+NetDegree : 2
+p2 B
+a0 B
+NetDegree : 2
+p3 B
+a0 B
+NetDegree : 4
+p4 B
+p5 B
+p6 B
+a0 B
+		</span>
+		<script>
+window.nodesfile = document.getElementById('debugNodes').innerText;
+window.netsfile = document.getElementById('debugNets').innerText;
+window.onload = main;
+		</script>
 	</body>
 </html>
