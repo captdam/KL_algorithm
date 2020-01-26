@@ -1,42 +1,37 @@
 'use srict';
 /* KL utils*/
 
-//Get the D, I and E value for all nodes in the design
-function getDIE(design,netlist) {
-	['groupA','groupB'].map( group => {
-		for (var i = 0; i < design[group].length; i++) { //Find D I E for all nodes
-			design[group][i].I = 0;
-			design[group][i].E = 0;
-			netlist.map( edge => { //For each node in the design, check all edges
-//				console.log('I'+design[group][i].I,'E'+design[group][i].E);
-//				console.log('Check node '+design[group][i].name+' edge ',edge.nodes);
-				//Case 1 - This edge is not connected to this node
-				if (!edge.nodes.includes(design[group][i].name))
-					return;
-				//Then, consider all nodes connected to this edge, except this node
-				var edgeWithoutThisNode = {
-					"nodes" : edge.nodes.filter( x => {return x != design[group][i].name} )
-				};
-				//Case 2 - This edge connected nodes both inside and outside of the group
-				if (isInterConnect(design,edgeWithoutThisNode)) {
-					design[group][i].I += edge.weight;
-					design[group][i].E += edge.weight;
-					return;
-				}
-				//Case 3 - This edge connected nodes only in / out of the current group
-				if ( getNodeGroup(design,design[group][i].name) == getNodeGroup(design,edgeWithoutThisNode.nodes[0]) ) //Same group
-					design[group][i].I += edge.weight;
-				else
-					design[group][i].E += edge.weight;
-				
-			} );
-			design[group][i].D = design[group][i].E - design[group][i].I;
+//Get the D, I and E value for a nodes in the design
+function getNodeDIE(nodeName,design,netlist) {
+	var i = 0, d = 0, e = 0;
+	netlist.map( edge => { //For each node in the design, check all edges
+		//Case 1 - This edge is not connected to this node
+		if (!edge.nodes.includes(nodeName))
+			return;
+		
+		//Then, consider all nodes connected to this edge, except this node
+		var edgeWithoutThisNode = {
+			"nodes" : edge.nodes.filter( x => {return x != nodeName} )
+		};
+		//Case 2 - This edge connects to nodes both inside and outside of the group
+		if (isInterConnect(design,edgeWithoutThisNode)) {
+			i += edge.weight;
+			e += edge.weight;
+			return;
 		}
+		//Case 3 - This edge connected nodes only in / out of the current group
+		/* edgeWithoutThisNode[0] represents the group all nodes*/
+		if ( getNodeGroup(design,nodeName) == getNodeGroup(design,edgeWithoutThisNode.nodes[0]) ) //Same group
+			i += edge.weight;
+		else
+			e += edge.weight;
+		
 	} );
+	return [e-i,i,e];
 }
 
 //Get the weighted cost of inter-connect edges in this design (cut-cost)
-function countInterConnect(design,netlist) {
+/*function countInterConnect(design,netlist) {
 	var interConnect = 0, cost = 0;
 	netlist.map( x => { //Check all edges
 		if ( isInterConnect(design,x) ) {
@@ -45,7 +40,7 @@ function countInterConnect(design,netlist) {
 		}
 	} );
 	return interConnect;
-}
+}*/
 
 //Test if a edge connects nodes from more than one group
 function isInterConnect(design,edge) {
@@ -58,18 +53,30 @@ function isInterConnect(design,edge) {
 
 //Where is the node? return 'A' or 'B'
 function getNodeGroup(design,nodeName) {
-	for (var i = 0; i < design.groupA.length; i++) {
-		if (design.groupA[i].name == nodeName)
-			return 'A';
-	}
+	if (design.groupA[nodeName])
+		return 'A';
 	return 'B';
 }
 
 //Get node info ()
-function getNodeInfo(design,nodeName) {
-	var info = null;
-	design['group'+getNodeGroup(design,nodeName)].map( x => {
-		if (x.name == nodeName) info = x;
+/*function getNodeInfo(design,nodeName) {
+	return design.groupA[nodeName] | design.groupB[nodeName];
+}*/
+
+//Get the sum of all edges that connects the given two nodes
+function getCost(netlist,nodeAName,nodeBName) {
+	cost = 0;
+	netlist.map( x => {
+		if (x.nodes.includes(nodeAName) && x.nodes.includes(nodeBName))
+			cost += x.weight;
 	} );
-	return info;
+	return cost;
+}
+
+//Swap element in a design (Notice: JS function pass the copy of reference of object)
+function swap(design, nodeAName, nodeBName) {
+	design.groupA[nodeBName] = design.groupB[nodeBName];
+	design.groupB[nodeAName] = design.groupA[nodeAName];
+	delete design.groupA[nodeAName];
+	delete design.groupB[nodeBName];
 }

@@ -17,6 +17,8 @@
 		
 		
 		<script>
+'use strict';
+const canvasSize = [800,600];
 
 document.getElementById('nodefile').onchange = () => {
 	fileReader(document.getElementById('nodefile').files[0]).then( x => {
@@ -32,12 +34,13 @@ document.getElementById('netfile').onchange = () => {
 };
 
 function main() {
+	var index = null;
+	var workloop = 0;
 	
 	// Design data structure - Solution of partitioning
 	var bestDesign = {
-		"groupA" : [],
-		"groupB" : [],
-		"interconnect" : 0,
+		"groupA" : {},
+		"groupB" : {}
 	}
 	var currentDesign = bestDesign;
 	
@@ -46,64 +49,101 @@ function main() {
 	// 1- Process the files, save nodes and nets in  array
 	var nodes = getNodes(window.nodesfile);
 	var edges = getEdges(window.netsfile);
-	console.log('Nodes:',nodes);
-	console.log('Edges:',edges);
+	console.log('Nodes:',lo(nodes));
+	console.log('Edges:',lo(edges));
 	
 	// 2 - Generate first partition design
-	for (var i = 0; i < nodes.length; i++) { //Split by even/odd index
-		if (i&1) currentDesign.groupA.push(nodes[i]);
-		else currentDesign.groupB.push(nodes[i]);
+	index = 0;
+	for (var key in nodes) { //Split by even/odd index
+		if (index++&1) currentDesign.groupA[key] = nodes[key];
+		else currentDesign.groupB[key] = nodes[key];
 	}
-	getDIE(currentDesign,edges);
-	console.log('Design 0:',currentDesign);
+	console.log('Design 0:',lo(currentDesign));
 	draw(currentDesign,edges);
 	
 	bestDesign = currentDesign;
 	updateBestCanvas();
 	
 	// KL greedy loop
+	var gain = null;
 	do {
-//		var dTable = {};
-//		currentDesign.groupA.map( nodeA => {
-//			currentDesign.groupB.map( nodeB => {
-//				dTable[nodeA][nodeB] = nodeA.D + nodeB.D - 2 * 1; //////////////////////ASSUME COST TO BE 1
-//			} );
-//		} );
+		var design = lo(currentDesign); //Copy the current design for this try
 		
-		var gainStep = [];
+		var gainStep = []; //gainStep[step] = gainAtThatStep
+		var gainStepNodes = []; //Which pair are switched at that step
 		
+		['groupA','groupB'].map( group => { //Find D value for all nodes
+			for (var key in design[group]) {
+				var die = getNodeDIE(key,design,edges);
+				design[group][key].D = die[0];
+				design[group][key].I = die[1];
+				design[group][key].E = die[2];
+			}
+		} );
+		
+			
 		//KL - find pairs of unlocked nodes which gives best result
-		for (var i = 0, i < design.groupA.length; i++) { //groupA has same or 1 less element then B
+		var unlockedA = [], unlockedB = [];
+		for (var key in design.groupA) unlockedA.push(key);
+		for (var key in design.groupB) unlockedB.push(key);
+		var gAcc = 0;
+		
+		for (var i = 0; i < Object.keys(design.groupA).length; i++) { //groupA has same or 1 less element then B
 			
 			//Search for best pair
 			var bestPair = null; //[a,b,gain]
-			for (var a = 0; a < design.groupA.length; a++) {
-				if (design.groupA[a].locked) continue; //Do not consider the locked
-				for (var b = 0; b < design.groupB.length; b++) {
-					if (design.groupB[b].locked) continue;
-					
-					var gain = design.groupA[a].D + design.groupB[b].D - 2 * getCost(design.groupA[a].name,design.groupB[b].name);
-					if ( !bestPair || gain > bestPair[2] )
-						bestPair = [a,b,gain];
-				}
-			}
+			unlockedA.map ( a => {
+				unlockedB.map( b => {
+					var g = design.groupA[a].D + design.groupB[b].D - 2 * getCost(edges,a,b);
+//					console.log('  Exchange '+a+' and '+b+' ==> Gain = '+g);
+					if (!bestPair || bestPair[2] < g)
+						bestPair = [a,b,g];
+				} );
+			} );
 			
-			//Lock and record current step
-			design.groupA[bestPair[0]].lock = true;
-			design.groupB[bestPair[1]].lock = true;
-			gainStep.push(bestPair);
+			//Now we have the best pair, lock and record
+			var bestA = bestPair[0], bestB = bestPair[1], bestGain = bestPair[2];
+			unlockedA = unlockedA.filter( x => {return x != bestA} );
+			unlockedB = unlockedB.filter( x => {return x != bestB} );
+			
+			gAcc += bestGain;
+			gainStep.push(gAcc);
+			gainStepNodes.push([bestA,bestB]);
+			
+			//Exchange
+			swap(design,bestA,bestB);
+			console.log('  ['+i+'] Best pair: ',lo(bestPair),'Gsin = '+gAcc,'Aft swap: ',lo(design));
+			
+			//Update D value of unclocked nodes
+			unlockedA.map( key => {
+				var die = getNodeDIE(key,design,edges);
+				design.groupA[key].D = die[0];
+				design.groupA[key].I = die[1];
+				design.groupA[key].E = die[2];
+			} );
+			unlockedB.map( key => {
+				var die = getNodeDIE(key,design,edges);
+				design.groupB[key].D = die[0];
+				design.groupB[key].I = die[1];
+				design.groupB[key].E = die[2];
+			} );
+			
 		}
 		
-		//Find k where the gain is max
-		var maxGain = 0, maxGainAt = 0;
-		for (var i = 0, i < design.groupA.length; i++) {
-			if
+		//Find which step that gain is max
+		var gMax = Math.max(...gainStep);
+		var gMaxStep = gainStep.findIndex( x => {return x == gMax} );
+		for (var i = 0; i <= gMaxStep; i++) {
+			swap(currentDesign,gainStepNodes[i][0],gainStepNodes[i][1]);
 		}
 		
-	} while (gain);
+		draw(currentDesign,edges);
+		console.log('Design '+(++workloop)+': ',lo(currentDesign),'Gain = '+gMax);
+		
+	} while (gMax > 0 && workloop < 20);
 	
 	console.log('Done! Best result shown below:');
-	console.log(bestDesign);
+	console.log(lo(bestDesign));
 	
 	
 }
@@ -111,8 +151,8 @@ function main() {
 function draw(design,netlist) {
 
 	//Config
-	var canvasWidth = 800, canvasHeight = 600;
-	var groupAPos = [25,25], groupBPos = [475,25], groupSize = [300,550], groupMargin = 10;
+	var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
+	var groupAPos = [25,25], groupBPos = [canvasSize[0]/2+25,25], groupSize = [canvasSize[0]/2-50,canvasSize[1]-50], groupMargin = 10;
 	
 	//Util
 	var drawNodeA = pos => {return [ pos[0] * groupSize[0] + groupAPos[0] , pos[1] * groupSize[1] + groupAPos[1] ];}
@@ -125,82 +165,95 @@ function draw(design,netlist) {
 	
 	var ctx = canvas.getContext('2d');
 	ctx.font = '12px Courier';
-	ctx.clearRect(0,0,800,600);
 	
-	//Reformat data structure for better for the draw util
-	var aNode = {}, bNode = {};
-	design.groupA.map( x => { aNode[x.name] = drawNodeA(x.pos); } );
-	design.groupB.map( x => { bNode[x.name] = drawNodeB(x.pos); } );
-	
-	//Draw nodes (draw circle/dot)
-	for (ai in aNode) {
-		ctx.beginPath();
-		ctx.arc(aNode[ai][0],aNode[ai][1],2,0,Math.PI*2); //x,y,r,startAngle,angle
-		ctx.stroke();
-		ctx.fillText(ai,aNode[ai][0]-5,aNode[ai][1]+10);
-	}
-	for (bi in bNode) {
-		ctx.beginPath();
-		ctx.arc(bNode[bi][0],bNode[bi][1],2,0,Math.PI*2); //x,y,r,startAngle,angle
-		ctx.stroke();
-		ctx.fillText(bi,bNode[bi][0]-5,bNode[bi][1]+10);
-	}
-	
-	//Draw edges (draw line)
-	netlist.map( edge => {
-		var r = getRandom(80,200);
-		var g = getRandom(80,200);
-		var b = getRandom(80,200);
-		ctx.strokeStyle = 'rgb('+r+','+g+','+b+')';
-		
-		if (edge.nodes.length > 2) { //Hyperedge, using hub
-			var hub = drawNodeA(edge.pos); //Assume all nodes in group A
-			if ( isInterConnect(design,edge) ) {
-				hub[0] = canvasWidth / 2; //Inter-connect: Pos X should be horizontal center of canvas
-			}
-			else {
-				if ( aNode[edge.nodes[0]] ) {//If not inter-connect, node[0] gives the grouping for all nodes
-					hub = drawNodeB(edge.pos);
-					console.log('b',edge);
-				}
-			}
-			edge.nodes.map( x => {
-				ctx.beginPath();
-				ctx.moveTo(hub[0],hub[1]); //Start at hub position, then to the connected node
-				if (aNode[x]) ctx.lineTo(aNode[x][0],aNode[x][1]);
-				else ctx.lineTo(bNode[x][0],bNode[x][1]);
-				ctx.stroke();
-			} );
-		}
-		else { //Two node, directly connect
-			ctx.beginPath();
-			if (aNode[edge.nodes[0]])	ctx.moveTo(aNode[edge.nodes[0]][0],aNode[edge.nodes[0]][1]);
-			else				ctx.moveTo(bNode[edge.nodes[0]][0],bNode[edge.nodes[0]][1]);
-			if (aNode[edge.nodes[1]])	ctx.lineTo(aNode[edge.nodes[1]][0],aNode[edge.nodes[1]][1]);
-			else				ctx.lineTo(bNode[edge.nodes[1]][0],bNode[edge.nodes[1]][1]);
-			ctx.stroke();
-		}
-	} );
+	//Clear canvas
+	ctx.fillStyle = '#F2F2F2';
+	ctx.fillRect(0,0,canvasWidth,canvasHeight);
 	
 	//Draw misc
-	ctx.fillText('Cost = '+design.interconnect,2,10);
-	ctx.fillText('Zone A',groupAPos[0],canvasHeight-5);
-	ctx.fillText('Zone B',groupBPos[0],canvasHeight-5);
-	ctx.strokeStyle = '#DDDDDD';
+	ctx.fillStyle = '#000000';
+	ctx.fillText('Group A',groupAPos[0],canvasHeight-5);
+	ctx.fillText('Group B',groupBPos[0],canvasHeight-5);
+	ctx.strokeStyle = '#CCCCCC';
 	ctx.strokeRect(groupAPos[0]-groupMargin,groupAPos[1]-groupMargin,groupSize[0]+2*groupMargin,groupSize[1]+2*groupMargin);
 	ctx.strokeRect(groupBPos[0]-groupMargin,groupBPos[1]-groupMargin,groupSize[0]+2*groupMargin,groupSize[1]+2*groupMargin);
 	ctx.beginPath();
 	ctx.moveTo(canvasWidth/2,groupMargin);
 	ctx.lineTo(canvasWidth/2,canvasHeight-groupMargin);
 	ctx.stroke();
+	
+	var cost = 0;
+	
+	//Draw edges (draw line)
+	netlist.map( edge => {
+		ctx.strokeStyle = 'rgb('+getRandom(40,220)+','+getRandom(40,220)+','+getRandom(40,220)+')';
+		
+		if (edge.nodes.length > 2) { //Hyperedge, using hub
+			var hub = []; //Assume all nodes in group A
+			if ( isInterConnect(design,edge) ) {
+				hub = drawNodeA(edge.pos);
+				hub[0] = canvasWidth / 2; //Inter-connect: Pos X should be horizontal center of canvas
+				cost += edge.weight;
+			}
+			else {
+				if ( design.groupA[edge.nodes[0]] ) //If not inter-connect, node[0] gives the grouping for all nodes
+					hub = drawNodeA(edge.pos);
+				else
+					hub = drawNodeB(edge.pos);
+			}
+			
+			edge.nodes.map( x => {
+				ctx.beginPath();
+				ctx.moveTo(...hub); //Start at hub position, then to the connected node
+				if (design.groupA[x])
+					ctx.lineTo(...drawNodeA(design.groupA[x].pos));
+				else
+					ctx.lineTo(...drawNodeB(design.groupB[x].pos));
+				ctx.stroke();
+			} );
+		}
+		else { //Two node, directly connect
+			ctx.beginPath();
+			if (design.groupA[edge.nodes[0]])	ctx.moveTo(...drawNodeA(design.groupA[edge.nodes[0]].pos));
+			else					ctx.moveTo(...drawNodeB(design.groupB[edge.nodes[0]].pos));
+			if (design.groupA[edge.nodes[1]])	ctx.lineTo(...drawNodeA(design.groupA[edge.nodes[1]].pos));
+			else					ctx.lineTo(...drawNodeB(design.groupB[edge.nodes[1]].pos));
+			ctx.stroke();
+			
+			if ( isInterConnect(design,edge) )
+				cost += edge.weight;
+		}
+	} );
+	
+	//Draw nodes (draw circle/dot)
+	for (var a in design.groupA) {
+		ctx.strokeStyle = 'rgb(0,0,0)';
+		var [x,y] = drawNodeA(design.groupA[a].pos);
+		ctx.beginPath();
+		ctx.arc(x,y,2,0,Math.PI*2); //x,y,r,startAngle,angle
+		ctx.stroke();
+		ctx.fillText(a,x-5,y+10);
+	}
+	for (var b in design.groupB) {
+		ctx.strokeStyle = 'rgb(0,0,0)';
+		var [x,y] = drawNodeB(design.groupB[b].pos);
+		ctx.beginPath();
+		ctx.arc(x,y,2,0,Math.PI*2); //x,y,r,startAngle,angle
+		ctx.stroke();
+		ctx.fillText(b,x-5,y+10);
+	}
+	
+	//Print cost - This value is calculated by the draw function
+	ctx.fillStyle = '#000000';
+	ctx.fillText('Cost = '+cost,2,10);
 }
 
 function updateBestCanvas() {
 	var canvas = document.getElementById('bestCanvas');
 	var ctx = canvas.getContext('2d');
-	canvas.width = 800;
-	canvas.height = 600;
-	ctx.clearRect(0,0,800,600);
+	canvas.width = canvasSize[0];
+	canvas.height = canvasSize[1];
+	ctx.clearRect(0,0,...canvasSize);
 	ctx.drawImage(document.getElementById('currentCanvas'),0,0);
 }
 		</script>

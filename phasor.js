@@ -1,17 +1,15 @@
 'use strict';
 
 function getNodes(nodefile) {
-	var nodes = [];
+	var nodes = {};
 	var format = /^[ap][0-9]+/;
 	nodefile.split(/\n/).map( x => { //Read each line of the file
-		if ( format.test(x.trim()) ) nodes.push({
-			"name"		: x.replace('terminal','').trim(), //Remove the "terminal" note
+		if ( format.test(x.trim()) ) nodes[ x.replace('terminal','').trim() ] = { //Remove the "terminal" note
 			"pos"		: [Math.random(),Math.random()], //A random position for canvas
 			"I"		: null,
 			"E"		: null,
-			"D"		: null,
-			"locked"	: false
-		});
+			"D"		: null
+		};
 	} );
 	return nodes;
 }
@@ -44,10 +42,9 @@ function getEdges(netfile) {
 				nodes.push(netfile[i+j].replace(' B','').trim()); //Remove the meanless "B"
 			edges.push({
 				"nodes"		: nodes, //A collection (array) of all connected nodes
-				"weight"	: 1, //Assume weight of edge to be 1
+				"weight"	: 1, //Assume weight of edge to be 1 for now
 				"pos"		: [Math.random(),Math.random()], //A random position for canvas
 			});
-			console.log('Find new net: ',nodes);
 		}
 	}
 	return edges;
