@@ -19,6 +19,8 @@
 		<script>
 'use strict';
 const canvasSize = [800,600];
+const animationSpeed = 1500;
+const maxTryTimes = 20;
 
 document.getElementById('nodefile').onchange = () => {
 	fileReader(document.getElementById('nodefile').files[0]).then( x => {
@@ -136,8 +138,8 @@ function main() {
 		console.log('Design '+(++workloop)+': ',lo(currentDesign),'Gain = '+gMax);
 		
 		//Greedy
-		if (gMax > 0 && workloop < 20) {
-			setTimeout(kl,1500);
+		if (gMax > 0 && workloop < maxTryTimes) {
+			setTimeout(kl,animationSpeed);
 			bestDesign = lo(currentDesign);
 			draw(currentDesign,edges);
 		}
@@ -147,7 +149,7 @@ function main() {
 		}
 	}
 	
-	setTimeout(kl,1500);
+	setTimeout(kl,animationSpeed);
 }
 
 function draw(design,netlist) {
