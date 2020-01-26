@@ -49,7 +49,7 @@ function main() {
 	console.log('Nodes:',nodes);
 	console.log('Edges:',edges);
 	
-	// 2 - Generate first grouping
+	// 2 - Generate first partition design
 	for (var i = 0; i < nodes.length; i++) { //Split by even/odd index
 		if (i&1) currentDesign.groupA.push(nodes[i]);
 		else currentDesign.groupB.push(nodes[i]);
@@ -61,30 +61,47 @@ function main() {
 	bestDesign = currentDesign;
 	updateBestCanvas();
 	
-/*	// KL greedy loop
+	// KL greedy loop
 	do {
-		var exchange = [[],[]];
-		computer D value for all: D = E - I
-		var gv = [], av = [], bv = [];
+//		var dTable = {};
+//		currentDesign.groupA.map( nodeA => {
+//			currentDesign.groupB.map( nodeB => {
+//				dTable[nodeA][nodeB] = nodeA.D + nodeB.D - 2 * 1; //////////////////////ASSUME COST TO BE 1
+//			} );
+//		} );
+		
+		var gainStep = [];
 		
 		//KL - find pairs of unlocked nodes which gives best result
 		for (var i = 0, i < design.groupA.length; i++) { //groupA has same or 1 less element then B
 			
 			//Search for best pair
-			var bestPair = [0,0,D(a0--b0)]; //Assume the first has best result
+			var bestPair = null; //[a,b,gain]
 			for (var a = 0; a < design.groupA.length; a++) {
+				if (design.groupA[a].locked) continue; //Do not consider the locked
 				for (var b = 0; b < design.groupB.length; b++) {
-					gain = D(a--b);
-					if ( gain > best[2] )
+					if (design.groupB[b].locked) continue;
+					
+					var gain = design.groupA[a].D + design.groupB[b].D - 2 * getCost(design.groupA[a].name,design.groupB[b].name);
+					if ( !bestPair || gain > bestPair[2] )
 						bestPair = [a,b,gain];
 				}
 			}
 			
-			
+			//Lock and record current step
+			design.groupA[bestPair[0]].lock = true;
+			design.groupB[bestPair[1]].lock = true;
+			gainStep.push(bestPair);
+		}
+		
+		//Find k where the gain is max
+		var maxGain = 0, maxGainAt = 0;
+		for (var i = 0, i < design.groupA.length; i++) {
+			if
 		}
 		
 	} while (gain);
-*/	
+	
 	console.log('Done! Best result shown below:');
 	console.log(bestDesign);
 	
