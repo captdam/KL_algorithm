@@ -4,7 +4,7 @@ function getNodes(nodefile) {
 	var nodes = [];
 	var format = /^[ap][0-9]+/;
 	nodefile.split(/\n/).map( x => { //Read each line of the file
-		if ( format.test(x) ) nodes.push({
+		if ( format.test(x.trim()) ) nodes.push({
 			"name"		: x.replace('terminal','').trim(), //Remove the "terminal" note
 			"pos"		: [Math.random(),Math.random()], //A random position for canvas
 			"I"		: null,
@@ -33,7 +33,7 @@ function getEdges(netfile) {
 	netfile = netfile.split(/\n/); //Split into lines
 	var line1Format = /^NetDegree \: ([0-9]+)$/ //Return the number if RegExp.exec()
 	for (var i = 0; i < netfile.length; i++) {
-		var match = line1Format.exec(netfile[i]);
+		var match = line1Format.exec(netfile[i].trim());
 		/*
 		If matched: match[0] = matchedString; match[1...] = matchedSubString...
 		If mismatched: match = null
@@ -41,12 +41,13 @@ function getEdges(netfile) {
 		if (match) {
 			var nodes = []; //Get all nodes connected by this edge
 			for (var j = 1; j <= match[1]; j++)
-				nodes.push(netfile[i+j].replace(' B','')); //Remove the meanless "B"
+				nodes.push(netfile[i+j].replace(' B','').trim()); //Remove the meanless "B"
 			edges.push({
 				"nodes"		: nodes, //A collection (array) of all connected nodes
 				"weight"	: 1, //Assume weight of edge to be 1
 				"pos"		: [Math.random(),Math.random()], //A random position for canvas
 			});
+			console.log('Find new net: ',nodes);
 		}
 	}
 	return edges;
