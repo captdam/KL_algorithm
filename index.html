@@ -11,7 +11,7 @@
 		<p>Open web inspector to view log / debug info</p>
 		
 		<div>
-			<canvas id="bestCanvas"></canvas>
+			<canvas id="orginalCanvas"></canvas>
 			<canvas id="currentCanvas"></canvas>
 		</div>
 		
@@ -38,11 +38,10 @@ function main() {
 	var workloop = 0;
 	
 	// Design data structure - Solution of partitioning
-	var bestDesign = {
+	var bestDesign, currentDesign = {
 		"groupA" : {},
 		"groupB" : {}
-	}
-	var currentDesign = bestDesign;
+	};
 	
 	// 0 - Nodefile and netfile are ready when user load the files.
 	
@@ -60,13 +59,10 @@ function main() {
 	}
 	console.log('Design 0:',lo(currentDesign));
 	draw(currentDesign,edges);
-	
-	bestDesign = currentDesign;
-	updateBestCanvas();
+	updateOrginalCanvas();
 	
 	// KL greedy loop
-	var gain = null;
-	do {
+	var kl = () => {
 		var design = lo(currentDesign); //Copy the current design for this try
 		
 		var gainStep = []; //gainStep[step] = gainAtThatStep
@@ -112,7 +108,7 @@ function main() {
 			
 			//Exchange
 			swap(design,bestA,bestB);
-			console.log('  ['+i+'] Best pair: ',lo(bestPair),'Gsin = '+gAcc,'Aft swap: ',lo(design));
+			console.log('  ['+i+'] Best pair: ',lo(bestPair),'Gain = '+gAcc,'Aft swap: ',lo(design));
 			
 			//Update D value of unclocked nodes
 			unlockedA.map( key => {
@@ -137,15 +133,21 @@ function main() {
 			swap(currentDesign,gainStepNodes[i][0],gainStepNodes[i][1]);
 		}
 		
-		draw(currentDesign,edges);
 		console.log('Design '+(++workloop)+': ',lo(currentDesign),'Gain = '+gMax);
 		
-	} while (gMax > 0 && workloop < 20);
+		//Greedy
+		if (gMax > 0 && workloop < 20) {
+			setTimeout(kl,1500);
+			bestDesign = lo(currentDesign);
+			draw(currentDesign,edges);
+		}
+		else {
+			console.log('Done! Best result shown below:');
+			console.log(lo(bestDesign));
+		}
+	}
 	
-	console.log('Done! Best result shown below:');
-	console.log(lo(bestDesign));
-	
-	
+	setTimeout(kl,1500);
 }
 
 function draw(design,netlist) {
@@ -248,8 +250,8 @@ function draw(design,netlist) {
 	ctx.fillText('Cost = '+cost,2,10);
 }
 
-function updateBestCanvas() {
-	var canvas = document.getElementById('bestCanvas');
+function updateOrginalCanvas() {
+	var canvas = document.getElementById('orginalCanvas');
 	var ctx = canvas.getContext('2d');
 	canvas.width = canvasSize[0];
 	canvas.height = canvasSize[1];
@@ -302,9 +304,9 @@ p6 B
 a0 B
 		</span>
 		<script>
-window.nodesfile = document.getElementById('debugNodes').innerText;
-window.netsfile = document.getElementById('debugNets').innerText;
-window.onload = main;
+//window.nodesfile = document.getElementById('debugNodes').innerText;
+//window.netsfile = document.getElementById('debugNets').innerText;
+//window.onload = main;
 		</script>
 	</body>
 </html>
