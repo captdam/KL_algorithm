@@ -146,6 +146,7 @@ function main() {
 		else {
 			console.log('Done! Best result shown below:');
 			console.log(lo(bestDesign));
+			alert('Done!');
 		}
 	}
 	
@@ -193,13 +194,25 @@ function draw(design,netlist) {
 		ctx.strokeStyle = 'rgb('+getRandom(40,220)+','+getRandom(40,220)+','+getRandom(40,220)+')';
 		
 		if (edge.nodes.length > 2) { //Hyperedge, using hub
-			var hub = []; //Assume all nodes in group A
+			var ex = 0, ey = 0, nodeCount = 0;
+			var hub = [];
 			if ( isInterConnect(design,edge) ) {
-				hub = drawNodeA(edge.pos);
 				hub[0] = canvasWidth / 2; //Inter-connect: Pos X should be horizontal center of canvas
+				edge.nodes.map( node => {
+					ey += design['group'+getNodeGroup(design,node)][node].pos[1];
+					nodeCount++;
+				} );
+				hub[1] = drawNodeA([0,ey/nodeCount])[1];
 				cost += edge.weight;
 			}
 			else {
+				edge.nodes.map( node => {
+					ex += design['group'+getNodeGroup(design,node)][node].pos[0];
+					ey += design['group'+getNodeGroup(design,node)][node].pos[1];
+					nodeCount++;
+				} );
+				hub = drawNodeA([ex/nodeCount,ey/nodeCount]);
+				
 				if ( design.groupA[edge.nodes[0]] ) //If not inter-connect, node[0] gives the grouping for all nodes
 					hub = drawNodeA(edge.pos);
 				else
