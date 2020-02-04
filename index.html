@@ -18,8 +18,8 @@
 		
 		<script>
 'use strict';
-const canvasSize = [800,600];
-const animationSpeed = 1500;
+const canvasSize = [1600,1200];
+const animationSpeed = 2500;
 const maxTryTimes = 20;
 
 document.getElementById('nodefile').onchange = () => {
@@ -93,7 +93,7 @@ function main() {
 			unlockedA.map ( a => {
 				unlockedB.map( b => {
 					var g = design.groupA[a].D + design.groupB[b].D - 2 * getCost(edges,a,b);
-//					console.log('  Exchange '+a+' and '+b+' ==> Gain = '+g);
+//					console.log('    ==> Exchange '+a+' and '+b+' ==> Gain = '+g);
 					if (!bestPair || bestPair[2] < g)
 						bestPair = [a,b,g];
 				} );
@@ -211,12 +211,11 @@ function draw(design,netlist) {
 					ey += design['group'+getNodeGroup(design,node)][node].pos[1];
 					nodeCount++;
 				} );
-				hub = drawNodeA([ex/nodeCount,ey/nodeCount]);
 				
 				if ( design.groupA[edge.nodes[0]] ) //If not inter-connect, node[0] gives the grouping for all nodes
-					hub = drawNodeA(edge.pos);
+					hub = drawNodeA([ex/nodeCount,ey/nodeCount]);
 				else
-					hub = drawNodeB(edge.pos);
+					hub = drawNodeB([ex/nodeCount,ey/nodeCount]);
 			}
 			
 			edge.nodes.map( x => {

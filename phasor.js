@@ -43,7 +43,7 @@ function getEdges(netfile) {
 			edges.push({
 				"nodes"		: nodes, //A collection (array) of all connected nodes
 				"weight"	: 1, //Assume weight of edge to be 1 for now
-				"pos"		: [Math.random(),Math.random()], //A random position for canvas
+//				"pos"		: [Math.random(),Math.random()], //A random position for canvas
 			});
 		}
 	}
