@@ -19,7 +19,7 @@
 		<script>
 'use strict';
 const canvasSize = [1600,1200];
-const animationSpeed = 2500;
+const animationSpeed = 2000;
 const maxTryTimes = 20;
 
 document.getElementById('nodefile').onchange = () => {
@@ -38,6 +38,7 @@ document.getElementById('netfile').onchange = () => {
 function main() {
 	var index = null;
 	var workloop = 0;
+	var processStart = new Date();
 	
 	// Design data structure - Solution of partitioning
 	var bestDesign, currentDesign = {
@@ -60,8 +61,6 @@ function main() {
 		else currentDesign.groupB[key] = nodes[key];
 	}
 	console.log('Design 0:',lo(currentDesign));
-	draw(currentDesign,edges);
-	updateOrginalCanvas();
 	
 	// KL greedy loop
 	var kl = () => {
@@ -146,11 +145,24 @@ function main() {
 		else {
 			console.log('Done! Best result shown below:');
 			console.log(lo(bestDesign));
+			var processEnd = new Date();
+			var processTime = processEnd-processStart;
+			console.log('Takes '+processTime+'ms. ('+(processTime-workloop*animationSpeed)+'ms except animation time)')
 			alert('Done!');
 		}
 	}
 	
 	setTimeout(kl,animationSpeed);
+	draw(currentDesign,edges);
+	
+	(()=>{
+		var canvas = document.getElementById('orginalCanvas');
+		var ctx = canvas.getContext('2d');
+		canvas.width = canvasSize[0];
+		canvas.height = canvasSize[1];
+		ctx.clearRect(0,0,...canvasSize);
+		ctx.drawImage(document.getElementById('currentCanvas'),0,0);
+	})();
 }
 
 function draw(design,netlist) {
@@ -262,15 +274,6 @@ function draw(design,netlist) {
 	//Print cost - This value is calculated by the draw function
 	ctx.fillStyle = '#000000';
 	ctx.fillText('Cost = '+cost,2,10);
-}
-
-function updateOrginalCanvas() {
-	var canvas = document.getElementById('orginalCanvas');
-	var ctx = canvas.getContext('2d');
-	canvas.width = canvasSize[0];
-	canvas.height = canvasSize[1];
-	ctx.clearRect(0,0,...canvasSize);
-	ctx.drawImage(document.getElementById('currentCanvas'),0,0);
 }
 		</script>
 		<style>
