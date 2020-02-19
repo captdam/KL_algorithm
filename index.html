@@ -54,6 +54,25 @@ function main() {
 	console.log('Nodes:',lo(nodes));
 	console.log('Edges:',lo(edges));
 	
+	//Create cost table
+	var costAB = new Array();
+	for (var nodeA in nodes) {
+		costAB[nodeA] = new Array();
+		for (var nodeB in nodes)
+			costAB[nodeA][nodeB] = 0;
+	}
+	edges.map( x => {
+		var cost = x.weight / (x.nodes.length-1);
+		for (var nodeAIndex = 0; nodeAIndex < x.nodes.length - 1; nodeAIndex++) {
+			for (var nodeBIndex = nodeAIndex + 1; nodeBIndex < x.nodes.length; nodeBIndex++) {
+				costAB[ x.nodes[nodeAIndex] ][ x.nodes[nodeBIndex] ] += cost;
+				costAB[ x.nodes[nodeBIndex] ][ x.nodes[nodeAIndex] ] += cost;
+			}
+		}
+	} );
+	window.costAB = costAB;
+	console.log('Cost table: ',lo(window.costAB));
+	
 	// 2 - Generate first partition design
 	index = 0;
 	for (var key in nodes) { //Split by even/odd index
@@ -69,15 +88,19 @@ function main() {
 		var gainStep = []; //gainStep[step] = gainAtThatStep
 		var gainStepNodes = []; //Which pair are switched at that step
 		
+		var totalI = 0, totalE = 0;
 		['groupA','groupB'].map( group => { //Find D value for all nodes
 			for (var key in design[group]) {
 				var die = getNodeDIE(key,design,edges);
 				design[group][key].D = die[0];
 				design[group][key].I = die[1];
 				design[group][key].E = die[2];
+				console.log('--> Node '+key+' ('+group+'): ',design[group][key]);
+				totalI += design[group][key].I;
+				totalE += design[group][key].E;
 			}
 		} );
-		
+		console.log('--> Total E: '+totalE+' Total I:'+totalI);
 			
 		//KL - find pairs of unlocked nodes which gives best result
 		var unlockedA = [], unlockedB = [];

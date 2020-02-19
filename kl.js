@@ -82,6 +82,7 @@ function getNodeGroup(design,nodeName) {
 
 //Get the sum of all edges that connects the given two nodes
 function getCost(netlist,nodeAName,nodeBName) {
+	return window.costAB[nodeAName][nodeBName];
 	cost = 0;
 	netlist.map( x => {
 		if (x.nodes.includes(nodeAName) && x.nodes.includes(nodeBName))
