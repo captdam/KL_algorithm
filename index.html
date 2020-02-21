@@ -95,12 +95,12 @@ function main() {
 				design[group][key].D = die[0];
 				design[group][key].I = die[1];
 				design[group][key].E = die[2];
-				console.log('--> Node '+key+' ('+group+'): ',design[group][key]);
+//				console.log('--> Node '+key+' ('+group+'): ',design[group][key]);
 				totalI += design[group][key].I;
 				totalE += design[group][key].E;
 			}
 		} );
-		console.log('--> Total E: '+totalE+' Total I:'+totalI);
+		console.log('--> Before process: Total E: '+totalE+' Total I:'+totalI,lo(design));
 			
 		//KL - find pairs of unlocked nodes which gives best result
 		var unlockedA = [], unlockedB = [];
@@ -132,7 +132,7 @@ function main() {
 			
 			//Exchange
 			swap(design,bestA,bestB);
-			console.log('  ['+i+'] Best pair: ',lo(bestPair),'Gain = '+gAcc,'Aft swap: ',lo(design));
+//			console.log('  ['+i+'] Best pair: ',lo(bestPair),'Gain = '+gAcc,'Aft swap: ',lo(design));
 			
 			//Update D value of unclocked nodes
 			unlockedA.map( key => {
@@ -296,7 +296,8 @@ function draw(design,netlist) {
 	
 	//Print cost - This value is calculated by the draw function
 	ctx.fillStyle = '#000000';
-	ctx.fillText('Cost = '+cost,2,10);
+	ctx.fillText('Cutsize = '+cost,2,10);
+	console.log('[DRAW CHECK] Cutsize = '+cost);
 }
 		</script>
 		<style>
