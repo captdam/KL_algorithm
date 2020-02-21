@@ -1,16 +1,17 @@
 #define MAX_TRY_TIME 3
 
 #define DEBUG 1
-#define DEBUG_PARSER 0
-#define DEBUG_KLUTIL 0
-#define DEBUG_FINDLOCALMAX 0
+#define DEBUG_PARSER 1
+#define DEBUG_KLUTIL 1
+#define DEBUG_FINDLOCALMAX 1
 
-#define SAVE_INTERRESULE 1
+#define SAVE_INTERRESULE 1 //Intermediate result saved in file
 
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "parser.c"
 #include "klutil.c"
@@ -22,9 +23,22 @@ int main(int argc, char* argv[]) {
 *******************************************************************************/
 
 	if (argc < 2) {
-		printf("Missing argument.\n");
+		puts("Missing argument.");
 		return -1;
 	}
+
+	//To save the result
+	char* resultFilename = (char*) malloc(strlen(argv[1])+11+1); //"param" + 11 "_result.txt" + 1 "\0"
+	strcpy(resultFilename,argv[1]);
+	strcat(resultFilename,"_result.txt");
+	FILE* resultFilefp = fopen(resultFilename,"w");
+	fprintf(resultFilefp,"Result for file :%s\n",argv[1]);
+
+	time_t currentTime;
+	time(&currentTime);
+	struct tm* localTime = localtime(&currentTime);
+	fprintf(resultFilefp,"Created at: %s\n",asctime(localTime));
+	
 
 /*******************************************************************************
 2 - Read the nodes and nets file, saving in nodelist and netlist
@@ -35,7 +49,7 @@ int main(int argc, char* argv[]) {
 	char** nodelist;
 	unsigned long int nodeCount = readNodefile(argv[1],&nodelist);
 #if(DEBUG)
-	printf("> Found following nodes:\n");
+	puts("> Found following nodes:");
 	for (unsigned long int i = 0; i < nodeCount; i++)
 		printf("> Found node %s.\n",nodelist[i]);
 #endif
@@ -43,13 +57,13 @@ int main(int argc, char* argv[]) {
 	struct Net** netlist;
 	unsigned long int netCount = readNetfile(argv[1],&netlist);
 #if(DEBUG)
-	printf("> Found following nets:\n");
+	puts("> Found following nets:");
 	for (unsigned long int i = 0; i < netCount; i++) {
-		printf("> Found net. With nodes: ");
+		fputs("> Found net. With nodes: ",stdout);
 		struct Net* currentNet = netlist[i];
 		for (unsigned long int j = 0; j < currentNet->nodeCount; j++)
 			printf("%s ",currentNet->connectedNode[j]);
-		printf("\n");
+		puts("");
 	}
 #endif
 
@@ -73,7 +87,7 @@ int main(int argc, char* argv[]) {
 *******************************************************************************/
 
 	//For each node pair, get the sum of (cost of that node pair in an edge)
-	printf("Calculating cost between nodes.\n");
+	puts("Calculating cost between nodes.");
 	double costAB[nodeCount][nodeCount];
 
 	for (unsigned long int i = 0; i < nodeCount; i++) { //By default, there is no cost (not inter-connected)
@@ -90,7 +104,7 @@ int main(int argc, char* argv[]) {
 		for (unsigned long int j = 0; j < currentNet->nodeCount; j++) {
 			printf("%s ",currentNet->connectedNode[j]);
 		}
-		printf("\n");
+		puts("");
 #endif
 		for (unsigned long int j = 0; j < currentNet->nodeCount - 1; j++) { //Add up current edge's cost to the nodes
 			for (unsigned long int k = j + 1; k < currentNet->nodeCount; k++) {
@@ -105,36 +119,38 @@ int main(int argc, char* argv[]) {
 	}
 
 #if(SAVE_INTERRESULE)
-	printf("Saving cost table in CSV file for reference.\n");
-	printf("--> Note: Accuracy will be lost due to number representation.\n");
+	fputs("> Saving cost table in CSV file for reference: ",stdout);
 
-	char* fullFilename = (char*) malloc(strlen(argv[1])+9+1); //"param" + 9 ".cost.csv" + 1 "\0"
-	strcpy(fullFilename,argv[1]);
-	strcat(fullFilename,".cost.csv");
-	FILE* fp = fopen("cost.csv","w");
+	char* costFilename = (char*) malloc(strlen(argv[1])+9+1); //"param" + 9 "_cost.csv" + 1 "\0"
+	strcpy(costFilename,argv[1]);
+	strcat(costFilename,"_cost.csv");
+	FILE* costFilefp = fopen(costFilename,"w");
 
 	for (unsigned long int i = 0; i < nodeCount; i++) { //Header
 		char sep = (i == nodeCount - 1) ? '\n' : ',';
-		fputs(nodelist[i],fp);
-		fputc(sep,fp);
+		fputs(nodelist[i],costFilefp);
+		fputc(sep,costFilefp);
 	}
 
 	for (unsigned long int j = 0; j < nodeCount; j++) {
 		for (unsigned long int k = 0; k < nodeCount; k++) {
 			char sep = (k == nodeCount - 1) ? '\n' : ',';
-			fprintf(fp,"%f",costAB[j][k]);
-			fputc(sep,fp);
+			fprintf(costFilefp,"%f",costAB[j][k]);
+			fputc(sep,costFilefp);
 		}
 	}
 
-	fclose(fp);
-	free(fullFilename);
+	fclose(costFilefp);
+	free(costFilename);
+
+	puts("Saved.");
+	puts("--> Note: Accuracy will be lost due to number representation.");
 #endif
 
 /*******************************************************************************
 4 - Create the init partitionning: Design 0
 *******************************************************************************/
-	printf("\nNew design 0 (Init):\n");
+	puts("\nNew design 0 (Init):");
 	char nodeGroup[nodeCount]; //'A' or 'B'
 	struct NodeInfo nodeInfo[nodeCount];
 
@@ -142,12 +158,12 @@ int main(int argc, char* argv[]) {
 	for (unsigned long int i = 0; i < nodeCount; i++)
 		nodeGroup[i] = 'A' + (i&1); //A+0=A, A+1=B
 
-	printf("> Group A:\n");
+	puts("> Group A:");
 	for (unsigned long int i = 0; i < nodeCount; i++) {
 		if (nodeGroup[i] == 'A')
 			printf("--> %s\n",nodelist[i]);
 	}
-	printf("> Group B:\n");
+	puts("> Group B:");
 	for (unsigned long int i = 0; i < nodeCount; i++) {
 		if (nodeGroup[i] == 'B')
 			printf("--> %s\n",nodelist[i]);
@@ -167,9 +183,27 @@ int main(int argc, char* argv[]) {
 		printf("--> Node %5s (%5lu) G-%c \t D = %.3f, I = %.3f, E = %.3f.\n",nodelist[i],i,nodeGroup[i],nodeInfo[i].d,nodeInfo[i].i,nodeInfo[i].e);
 	}
 #endif
-	
+	unsigned long int initCutsize = findCutsize(nodeGroup, nodelist, nodeCount, netlist, netCount);
+	printf("> Cut size = %lu\n",initCutsize);
+
 #if(SAVE_INTERRESULE)
-	
+	fputs("> Saving Design 0 (Init): ",stdout);
+
+	fputs("New design 0 (Init):\n",resultFilefp);
+	fputs("> Group A:\n",resultFilefp);
+	for (unsigned long int i = 0; i < nodeCount; i++) {
+		if (nodeGroup[i] == 'A')
+			fprintf(resultFilefp,"--> %s\n",nodelist[i]);
+	}
+	fputs("> Group B:\n",resultFilefp);
+	for (unsigned long int i = 0; i < nodeCount; i++) {
+		if (nodeGroup[i] == 'B')
+			fprintf(resultFilefp,"--> %s\n",nodelist[i]);
+	}
+	fprintf(resultFilefp,"> Total E cost = %.3f, total I cost = %.3f.\n",totalE, totalI);
+	fprintf(resultFilefp,"> Cut size = %lu\n",initCutsize);
+
+	puts("Saved.");
 #endif
 
 /*******************************************************************************
@@ -194,10 +228,7 @@ int main(int argc, char* argv[]) {
 			klNodeGroup[i] = nodeGroup[i]; //Deep copy the current partitioning
 			klBestNodeGroup[i] = nodeGroup[i];
 			klLocked[i] = 0; //Unlock all nodes
-		}
-
-		for (unsigned long int i = 0; i < nodeCount; i++) { //We have to first know the partition before calculate DIE values
-			klNodeInfo[i] = findNodeInfo(i,nodeCount,klNodeGroup,costAB);
+			klNodeInfo[i] = findNodeInfo(i,nodeCount,nodeGroup,costAB);
 		}
 
 		//To record the gain
@@ -209,22 +240,18 @@ int main(int argc, char* argv[]) {
 		//Find the global max gain
 		for (unsigned long int i = 0; i < pairCount; i++) {
 
-#if(DEBUG)
-			printf("--> Finding best pair, current=%lu / total=%lu:\n",i,pairCount);
-#endif
-
 			//Find best pair (local max)
 			double localMaxGain = 0;
 			uint8_t localMaxGainValid = 0;
 			for (unsigned long int ia = 0; ia < nodeCount-1; ia++) { //For all nodes
 				for (unsigned long int ib = ia+1; ib < nodeCount; ib++) {
 #if(DEBUG_FINDLOCALMAX)
-					printf("----> Check node %5s (%5lu) G-%c with Node %5s (%5lu) G-%c: ",nodelist[ia],ia,klNodeGroup[ia],nodelist[ib],ib,klNodeGroup[ib]);
+					printf("----> Check Node %5s (%5lu) G-%c with Node %5s (%5lu) G-%c: ",nodelist[ia],ia,klNodeGroup[ia],nodelist[ib],ib,klNodeGroup[ib]);
 #endif
 
 					if ( klNodeGroup[ia] == klNodeGroup[ib] || klLocked[ia] || klLocked[ib] ) { //Unlocked, from different group
 #if(DEBUG_FINDLOCALMAX)
-						printf("Same group or locked.\n");
+						puts("Same group or locked.");
 #endif
 						continue;
 					}
@@ -240,6 +267,21 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
+/* // Difference between JS version and C version:
+   // The C version will pick up different node pair than JS version when multiple node pairs have the same gain
+   // The causes the final result between JS version  and C version slightly different
+
+			for (unsigned long int ia = 0; ia < nodeCount-1; ia++) { //For all nodes
+				for (unsigned long int ib = ia+1; ib < nodeCount; ib++) {
+					if ( klNodeGroup[ia] == klNodeGroup[ib] || klLocked[ia] || klLocked[ib] )
+						continue;
+
+					double gain = klNodeInfo[ia].d + klNodeInfo[ib].d - costAB[ia][ib] - costAB[ib][ia];
+					if (gain > localMaxGain - 0.001)
+						printf("------> Node %5s (%5lu) G-%c with Node %5s (%5lu) G-%c, gain = %f \n",nodelist[ia],ia,klNodeGroup[ia],nodelist[ib],ib,klNodeGroup[ib],gain);
+				}
+			}
+*/
 			//Lock the best pair, record gain and swap
 			for (unsigned long int ia = 0; ia < nodeCount-1; ia++) {
 				for (unsigned long int ib = ia+1; ib < nodeCount; ib++) {
@@ -253,7 +295,7 @@ int main(int argc, char* argv[]) {
 						klGainStep[i] = gain;
 						klGainAcc += gain;
 #if(DEBUG)
-						printf("--> Best pair node %5s (%5lu) G-%c with Node %5s (%5lu) G-%c. Gain = %f (Acc=%f).\n",nodelist[ia],ia,klNodeGroup[ia],nodelist[ib],ib,klNodeGroup[ib],gain,klGainAcc);
+						printf("----> [%5lu] Best pair Node %5s (%5lu) G-%c with Node %5s (%5lu) G-%c. Gain = %f (Acc=%f).\n",i,nodelist[ia],ia,klNodeGroup[ia],nodelist[ib],ib,klNodeGroup[ib],gain,klGainAcc);
 #endif
 
 						//Swap group
@@ -273,7 +315,7 @@ int main(int argc, char* argv[]) {
 								klBestNodeGroup[j] = klNodeGroup[j];
 							}
 #if(DEBUG)
-							printf("--> New gloabl max (%f) found at pair %lu.\n",klGainAccMax,klGainAccMaxAt);
+							printf("--> New gloabl max (%f) found after swapping %lu pairs.\n",klGainAccMax,klGainAccMaxAt+1);
 #endif
 						}
 
@@ -291,13 +333,13 @@ int main(int argc, char* argv[]) {
 		}
 
 #if(DEBUG)
-		printf("Result at now:\n");
-		printf("> Group A:\n");
+		puts("Result at now:");
+		puts("> Group A:");
 		for (unsigned long int i = 0; i < nodeCount; i++) {
 			if (klBestNodeGroup[i] == 'A')
 				printf("--> %s\n",nodelist[i]);
 		}
-		printf("> Group B:\n");
+		puts("> Group B:");
 		for (unsigned long int i = 0; i < nodeCount; i++) {
 			if (klBestNodeGroup[i] == 'B')
 				printf("--> %s\n",nodelist[i]);
@@ -307,25 +349,49 @@ int main(int argc, char* argv[]) {
 		//KL Greedy Algorithm - Is the current loop positive?
 		klGain = klGainAccMax;
 		if (klGain > 0) {
-			printf("Current KL loop is positive. Gain = %f, pair = %lu.\n",klGain,klGainAccMaxAt);
+			printf("Current KL loop is positive. Gain = %f, after swapping %lu pairs.\n",klGain,klGainAccMaxAt+1);
+
+			unsigned long int klCutsize = findCutsize(klBestNodeGroup, nodelist, nodeCount, netlist, netCount);
+			printf("> Cut size = %lu. Cut size gain = %lu.\n",klCutsize,initCutsize-klCutsize);
+
+#if(SAVE_INTERRESULE)
+			printf("> Saving Design %lu: ",workloop);
+
+			fprintf(resultFilefp,"\nNew design %lu:\n",workloop);
+			fputs("> Group A:\n",resultFilefp);
+			for (unsigned long int j = 0; j < nodeCount; j++) {
+				if (klBestNodeGroup[j] == 'A')
+					fprintf(resultFilefp,"--> %s\n",nodelist[j]);
+			}
+			fputs("> Group B:\n",resultFilefp);
+			for (unsigned long int j = 0; j < nodeCount; j++) {
+				if (klBestNodeGroup[j] == 'B')
+					fprintf(resultFilefp,"--> %s\n",nodelist[j]);
+			}
+			fprintf(resultFilefp,"> Gain = %f, after swapping %lu pairs.\n",klGain,klGainAccMaxAt+1);
+			fprintf(resultFilefp,"> Cut size = %lu\n",klCutsize);
+
+			puts("Saved.");
+#endif
+
 			for (unsigned long int j = 0; j < nodeCount; j++) //Apply the partition at global max
 				nodeGroup[j] = klBestNodeGroup[j];
 		}
 		else
-			printf("Current KL loop is negative.\nFollowing partition (from last loop) is the best result:\n");
+			puts("Current KL loop is negative.\nFollowing partition (from last KL iteration) shows the best result:");
 
 	} while (klGain > 0 && workloop++ < MAX_TRY_TIME);
 
 /*******************************************************************************
 6 - Show final result
 *******************************************************************************/
-	printf("\nFinal result:\n");
-	printf("> Group A:\n");
+	puts("\nFinal result:");
+	puts("> Group A:");
 	for (unsigned long int i = 0; i < nodeCount; i++) {
 		if (nodeGroup[i] == 'A')
 			printf("--> %s\n",nodelist[i]);
 	}
-	printf("> Group B:\n");
+	puts("> Group B:");
 	for (unsigned long int i = 0; i < nodeCount; i++) {
 		if (nodeGroup[i] == 'B')
 			printf("--> %s\n",nodelist[i]);
@@ -346,7 +412,33 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 
-	printf("DONE! (loop=%lu)\n\n",workloop);
+	//Find DIE value
+	unsigned long int cutsize = findCutsize(nodeGroup, nodelist, nodeCount, netlist, netCount);
+	printf("> Cut size = %lu. Cut size gain = %lu.\n",cutsize,initCutsize-cutsize);
+
+	//Save final result
+	fputs("> Saving Final Design: ",stdout);
+
+	fputs("\nFinal design:\n",resultFilefp);
+	fputs("> Group A:\n",resultFilefp);
+	for (unsigned long int i = 0; i < nodeCount; i++) {
+		if (nodeGroup[i] == 'A')
+			fprintf(resultFilefp,"--> %s\n",nodelist[i]);
+	}
+	fputs("> Group B:\n",resultFilefp);
+	for (unsigned long int i = 0; i < nodeCount; i++) {
+		if (nodeGroup[i] == 'B')
+			fprintf(resultFilefp,"--> %s\n",nodelist[i]);
+	}
+	fprintf(resultFilefp,"> Total E cost = %.3f, total I cost = %.3f.\n",totalE, totalI);
+	fprintf(resultFilefp,"> Cut size = %lu\n",cutsize);
+
+	puts("Saved.");
+
+	//End of process housekeeping
+	printf("DONE! (loop=%lu) Result saved in %s.\n\n",workloop,resultFilename);
+	fclose(resultFilefp);
+	free(resultFilename);
 	return 0;
 }
 

@@ -47,3 +47,32 @@ struct NodeInfo findNodeInfo(unsigned long int nodeIndex, unsigned long int node
 	return die;
 }
 
+// To calculate the cut size (number of nets which connects nodes from both group)
+unsigned long int findCutsize(char nodeGroup[], char* nodelist[], unsigned long int nodeCount, struct Net* netlist[], unsigned long netCount) {
+	unsigned long cutsize = 0;
+
+	//Check all nets
+	for (unsigned long int i = 0; i < netCount; i++) {
+		uint8_t hasAB[2] = {0,0}; //hasAB[0]=1 means this edge are connected to groupA, hasAB[1]=1 means this edge are connected to groupB
+
+		//Check all nodes in this net
+		for (unsigned long int j = 0; j < netlist[i]->nodeCount; j++) {
+			unsigned long int nodeIndex = getNodeIndex(netlist[i]->connectedNode[j], nodelist, nodeCount);
+			char group = nodeGroup[nodeIndex];
+#if(DEBUG_KLUTIL)
+			printf("--> [Net-%5lu] Check node %s (G-%c)\n",i,netlist[i]->connectedNode[j],group);
+#endif
+			hasAB[group-'A'] = 1;
+			if (hasAB[0] && hasAB[1]) { //This net connects nodes from both group
+				cutsize++;
+#if(DEBUG_KLUTIL)
+				puts("--> Cutsize++");
+#endif
+				j = netlist[i]->nodeCount; //Check next net
+			}
+		}
+	}
+
+	return cutsize;
+}
+

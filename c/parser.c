@@ -74,18 +74,18 @@ unsigned long int readNodefile(char* filename, char** *nodelist) {
 		else if ( nodenameLength = checkNode(buffer) ) {
 
 #if(DEBUG_PARSER)
-			printf("------> New node found.");
+			fputs("------> New node found.",stdout);
 #endif
 
 			//We have to know how much nodes are here; otherwise, we are not able to add nodes into our array
 			if ( nodeCount == (unsigned long int) -1 ) {
-				printf("\n[ERROR] Parser error. Unknown nodelist size.\n");
+				puts("\n[ERROR] Parser error. Unknown nodelist size.");
 				exit(0);
 			}
 
 			//Or, we find more nodes than what the file tells us at the beginning
 			if ( nodeIndex == nodeCount ) {
-				printf("\n[ERROR] Parser error. New node out of nodelist size.\n");
+				puts("\n[ERROR] Parser error. New node out of nodelist size.");
 				exit(0);
 			}
 
@@ -103,7 +103,7 @@ unsigned long int readNodefile(char* filename, char** *nodelist) {
 		//Get meanless line
 		else {
 #if(DEBUG_PARSER)
-			printf("------> DNC.\n");
+			puts("------> DNC.");
 #endif
 		}
 	}
@@ -198,7 +198,7 @@ unsigned long int readNetfile(char* filename, struct Net** *netlist) {
 			//Found all nodes, linkedlist pointer moves
 			if (!currentNetNodesCount) {
 #if(DEBUG_PARSER)
-				printf("------> All nodes connected to this edge are found:\n");
+				puts("------> All nodes connected to this edge are found:");
 				for (unsigned long int i = 0; i < ((*currentNetPtr)->net->nodeCount); i++)
 					printf("--------> %s\n",((*currentNetPtr)->net->connectedNode)[i]);
 #endif
@@ -235,4 +235,5 @@ unsigned long int readNetfile(char* filename, struct Net** *netlist) {
 
 	return netCount;
 }
+
 
