@@ -1,11 +1,17 @@
-#define MAX_TRY_TIME 3
+#define MAX_TRY_TIME 10
 
 #define DEBUG 1
-#define DEBUG_PARSER 1
-#define DEBUG_KLUTIL 1
-#define DEBUG_FINDLOCALMAX 1
+#define DEBUG_PARSER 0
+#define DEBUG_KLUTIL 0
+#define DEBUG_FINDLOCALMAX 0
 
 #define SAVE_INTERRESULE 1 //Intermediate result saved in file
+
+#define ACCEPT_ZERO_GAIN 0 // <-- OK it seems like useless. Infinite 0 gain repeated.
+/* NOTE:
+If enable ACCEPT_ZERO_GAIN, the software trade 0 gain as positive gain when swapping node pairs and repeating KL greedy iteration
+This slightly increase runtime (in case we have 0 gain, the software continues), but may find better result at the end
+*/
 
 #include <stdio.h>
 #include <stdint.h>
@@ -234,15 +240,15 @@ int main(int argc, char* argv[]) {
 		//To record the gain
 		unsigned long int klGainStep[pairCount];
 		double klGainAcc = 0;
-		double klGainAccMax = 0;
-		unsigned long int klGainAccMaxAt;
+		double klGainAccMax;
+		unsigned long int klGainAccMaxAt = (unsigned long int)-1; //Invalid
 
 		//Find the global max gain
-		for (unsigned long int i = 0; i < pairCount; i++) {
+		for (unsigned long int i = 0; i < pairCount; i++) { //Check all nodes to avoid local max
 
-			//Find best pair (local max)
-			double localMaxGain = 0;
-			uint8_t localMaxGainValid = 0;
+			//Find best pair, if gain is greater than last global max, replace it
+			double bestPairGain;
+			uint8_t bestPairGainValid = 0;
 			for (unsigned long int ia = 0; ia < nodeCount-1; ia++) { //For all nodes
 				for (unsigned long int ib = ia+1; ib < nodeCount; ib++) {
 #if(DEBUG_FINDLOCALMAX)
@@ -260,9 +266,9 @@ int main(int argc, char* argv[]) {
 #if(DEBUG_FINDLOCALMAX)
 					printf("Gain = %f.\n",gain);
 #endif
-					if ( (!localMaxGainValid) || localMaxGain < gain ) { //Not set yet or find new max
-						localMaxGain = gain;
-						localMaxGainValid = 1;
+					if ( (!bestPairGainValid) || bestPairGain < gain ) { //Not set yet or find new max
+						bestPairGain = gain;
+						bestPairGainValid = 1;
 					}
 				}
 			}
@@ -277,21 +283,22 @@ int main(int argc, char* argv[]) {
 						continue;
 
 					double gain = klNodeInfo[ia].d + klNodeInfo[ib].d - costAB[ia][ib] - costAB[ib][ia];
-					if (gain > localMaxGain - 0.001)
+					if (gain > bestPairGain - 0.001)
 						printf("------> Node %5s (%5lu) G-%c with Node %5s (%5lu) G-%c, gain = %f \n",nodelist[ia],ia,klNodeGroup[ia],nodelist[ib],ib,klNodeGroup[ib],gain);
 				}
 			}
 */
-			//Lock the best pair, record gain and swap
+
+			//Now we know the gain of the best pair, but we do not know which pair it is
 			for (unsigned long int ia = 0; ia < nodeCount-1; ia++) {
 				for (unsigned long int ib = ia+1; ib < nodeCount; ib++) {
 					if ( klNodeGroup[ia] == klNodeGroup[ib] || klLocked[ia] || klLocked[ib] )
 						continue;
 
 					double gain = klNodeInfo[ia].d + klNodeInfo[ib].d - costAB[ia][ib] - costAB[ib][ia];
-					if (localMaxGain == gain) { //Find the best pair
+					if (bestPairGain == gain) { //Find the best pair
 
-						//Record gain (local max)
+						//Record gain
 						klGainStep[i] = gain;
 						klGainAcc += gain;
 #if(DEBUG)
@@ -308,7 +315,11 @@ int main(int argc, char* argv[]) {
 						klLocked[ib] = 1;
 
 						//New global max found
-						if (klGainAccMax < klGainAcc) {
+#if(ACCEPT_ZERO_GAIN)
+						if (klGainAccMaxAt == (unsigned long int)-1 || klGainAccMax <= klGainAcc) {
+#else
+						if (klGainAccMaxAt == (unsigned long int)-1 || klGainAccMax < klGainAcc) {
+#endif
 							klGainAccMax = klGainAcc;
 							klGainAccMaxAt = i;
 							for (unsigned long int j = 0; j < nodeCount; j++) {//Save the current partition
@@ -319,7 +330,7 @@ int main(int argc, char* argv[]) {
 #endif
 						}
 
-						ia = nodeCount; //Stop when find the first max value
+						ia = nodeCount; //Stop when find the first best pair
 						ib = nodeCount;
 					}
 				}
@@ -346,41 +357,48 @@ int main(int argc, char* argv[]) {
 		}
 #endif
 
+		//Find cut size
+		unsigned long int klCutsize = findCutsize(klBestNodeGroup, nodelist, nodeCount, netlist, netCount);
+		printf("> Cut size = %lu. Cut size gain = %lu.\n",klCutsize,initCutsize-klCutsize);
+
 		//KL Greedy Algorithm - Is the current loop positive?
-		klGain = klGainAccMax;
+		klGain = (klGainAccMaxAt == (unsigned long int)-1) ? -1 : klGainAccMax; //-1 means no pisitive gain found
 		if (klGain > 0) {
 			printf("Current KL loop is positive. Gain = %f, after swapping %lu pairs.\n",klGain,klGainAccMaxAt+1);
 
-			unsigned long int klCutsize = findCutsize(klBestNodeGroup, nodelist, nodeCount, netlist, netCount);
-			printf("> Cut size = %lu. Cut size gain = %lu.\n",klCutsize,initCutsize-klCutsize);
-
-#if(SAVE_INTERRESULE)
-			printf("> Saving Design %lu: ",workloop);
-
-			fprintf(resultFilefp,"\nNew design %lu:\n",workloop);
-			fputs("> Group A:\n",resultFilefp);
-			for (unsigned long int j = 0; j < nodeCount; j++) {
-				if (klBestNodeGroup[j] == 'A')
-					fprintf(resultFilefp,"--> %s\n",nodelist[j]);
-			}
-			fputs("> Group B:\n",resultFilefp);
-			for (unsigned long int j = 0; j < nodeCount; j++) {
-				if (klBestNodeGroup[j] == 'B')
-					fprintf(resultFilefp,"--> %s\n",nodelist[j]);
-			}
-			fprintf(resultFilefp,"> Gain = %f, after swapping %lu pairs.\n",klGain,klGainAccMaxAt+1);
-			fprintf(resultFilefp,"> Cut size = %lu\n",klCutsize);
-
-			puts("Saved.");
-#endif
 
 			for (unsigned long int j = 0; j < nodeCount; j++) //Apply the partition at global max
 				nodeGroup[j] = klBestNodeGroup[j];
 		}
-		else
-			puts("Current KL loop is negative.\nFollowing partition (from last KL iteration) shows the best result:");
+		else {
+			printf("Current KL loop is negative (%f).\n",klGain);
+		}
 
+#if(SAVE_INTERRESULE)
+		printf("> Saving Design %lu: ",workloop);
+
+		fprintf(resultFilefp,"\nNew design %lu:\n",workloop);
+		fputs("> Group A:\n",resultFilefp);
+		for (unsigned long int j = 0; j < nodeCount; j++) {
+			if (klBestNodeGroup[j] == 'A')
+				fprintf(resultFilefp,"--> %s\n",nodelist[j]);
+		}
+		fputs("> Group B:\n",resultFilefp);
+		for (unsigned long int j = 0; j < nodeCount; j++) {
+			if (klBestNodeGroup[j] == 'B')
+				fprintf(resultFilefp,"--> %s\n",nodelist[j]);
+		}
+		fprintf(resultFilefp,"> Gain = %f, after swapping %lu pairs.\n",klGain,klGainAccMaxAt+1);
+		fprintf(resultFilefp,"> Cut size = %lu\n",klCutsize);
+
+		puts("Saved.");
+#endif
+
+#if(ACCEPT_ZERO_GAIN)
+	} while (klGain >= 0 && workloop++ < MAX_TRY_TIME);
+#else
 	} while (klGain > 0 && workloop++ < MAX_TRY_TIME);
+#endif
 
 /*******************************************************************************
 6 - Show final result
