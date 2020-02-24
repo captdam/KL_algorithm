@@ -39,6 +39,8 @@ function main() {
 	var index = null;
 	var workloop = 0;
 	var processStart = new Date();
+
+	var result = {};
 	
 	// Design data structure - Solution of partitioning
 	var bestDesign, currentDesign = {
@@ -71,7 +73,8 @@ function main() {
 		}
 	} );
 	window.costAB = costAB;
-	console.log('Cost table: ',lo(window.costAB));
+	result.costTable = costAB;
+	console.log('Cost table: ',costAB);
 	
 	// 2 - Generate first partition design
 	index = 0;
@@ -79,10 +82,29 @@ function main() {
 		if (index++&1) currentDesign.groupA[key] = nodes[key];
 		else currentDesign.groupB[key] = nodes[key];
 	}
-	console.log('Design 0:',lo(currentDesign));
+
+	var totalI = 0, totalE = 0;
+	['groupA','groupB'].map( group => { //Find D value for all nodes
+		for (var key in currentDesign[group]) {
+			var die = getNodeDIE(key,currentDesign,costAB);
+			currentDesign[group][key].D = die[0];
+			currentDesign[group][key].I = die[1];
+			currentDesign[group][key].E = die[2];
+//			console.log('--> Node '+key+' ('+group+'): ',currentDesign[group][key]);
+			totalI += currentDesign[group][key].I;
+			totalE += currentDesign[group][key].E;
+		}
+	} );
+
+	result.Design0 = {};
+	result.Design0.info = {"TotalE":totalE,"TotalI":totalI};
+	result.Design0.design = lo(currentDesign);
+	console.log('Design 0:',result.Design0.design);
+	console.log('--> Total E: '+totalE+' Total I:'+totalI);
 	
 	// KL greedy loop
 	var kl = () => {
+		workloop++;
 		var design = lo(currentDesign); //Copy the current design for this try
 		
 		var gainStep = []; //gainStep[step] = gainAtThatStep
@@ -91,7 +113,7 @@ function main() {
 		var totalI = 0, totalE = 0;
 		['groupA','groupB'].map( group => { //Find D value for all nodes
 			for (var key in design[group]) {
-				var die = getNodeDIE(key,design,edges);
+				var die = getNodeDIE(key,design,costAB);
 				design[group][key].D = die[0];
 				design[group][key].I = die[1];
 				design[group][key].E = die[2];
@@ -100,7 +122,6 @@ function main() {
 				totalE += design[group][key].E;
 			}
 		} );
-		console.log('--> Before process: Total E: '+totalE+' Total I:'+totalI,lo(design));
 			
 		//KL - find pairs of unlocked nodes which gives best result
 		var unlockedA = [], unlockedB = [];
@@ -114,7 +135,7 @@ function main() {
 			var bestPair = null; //[a,b,gain]
 			unlockedA.map ( a => {
 				unlockedB.map( b => {
-					var g = design.groupA[a].D + design.groupB[b].D - 2 * getCost(edges,a,b);
+					var g = design.groupA[a].D + design.groupB[b].D - costAB[a][b] - costAB[b][a];
 //					console.log('    ==> Exchange '+a+' and '+b+' ==> Gain = '+g);
 					if (!bestPair || bestPair[2] < g)
 						bestPair = [a,b,g];
@@ -136,13 +157,13 @@ function main() {
 			
 			//Update D value of unclocked nodes
 			unlockedA.map( key => {
-				var die = getNodeDIE(key,design,edges);
+				var die = getNodeDIE(key,design,costAB);
 				design.groupA[key].D = die[0];
 				design.groupA[key].I = die[1];
 				design.groupA[key].E = die[2];
 			} );
 			unlockedB.map( key => {
-				var die = getNodeDIE(key,design,edges);
+				var die = getNodeDIE(key,design,costAB);
 				design.groupB[key].D = die[0];
 				design.groupB[key].I = die[1];
 				design.groupB[key].E = die[2];
@@ -157,7 +178,10 @@ function main() {
 			swap(currentDesign,gainStepNodes[i][0],gainStepNodes[i][1]);
 		}
 		
-		console.log('Design '+(++workloop)+': ',lo(currentDesign),'Gain = '+gMax);
+		result['Design'+workloop] = {};
+		result['Design'+workloop].info = {"Gain":gMax};
+		result['Design'+workloop].design = lo(currentDesign);
+		console.log('Design '+(workloop)+': ',result['Design'+workloop].design,'Gain = '+gMax);
 		
 		//Greedy
 		if (gMax > 0 && workloop < maxTryTimes) {
@@ -166,12 +190,36 @@ function main() {
 			draw(currentDesign,edges);
 		}
 		else {
-			console.log('Done! Best result shown below:');
-			console.log(lo(bestDesign));
+			var totalI = 0, totalE = 0;
+			['groupA','groupB'].map( group => { //Find D value for all nodes
+				for (var key in bestDesign[group]) {
+					var die = getNodeDIE(key,bestDesign,costAB);
+					bestDesign[group][key].D = die[0];
+					bestDesign[group][key].I = die[1];
+					bestDesign[group][key].E = die[2];
+//					console.log('--> Node '+key+' ('+group+'): ',bestDesign[group][key]);
+					totalI += bestDesign[group][key].I;
+					totalE += bestDesign[group][key].E;
+				}
+			} );
+
+			result.Design_BEST = {};
+			result.Design_BEST.info = {"TotalE":totalE,"TotalI":totalI};
+			result.Design_BEST.design = lo(bestDesign);
+
+			console.log('Done! Best result: ',result.Design_BEST.design);
+			console.log('--> Total E: '+totalE+' Total I:'+totalI);
 			var processEnd = new Date();
 			var processTime = processEnd-processStart;
-			console.log('Takes '+processTime+'ms. ('+(processTime-workloop*animationSpeed)+'ms except animation time)')
-			alert('Done!');
+			console.log('Takes '+processTime+'ms. ('+(processTime-workloop*animationSpeed)+'ms except animation time)');
+
+			for (var eachDesign in result) {
+				for (var eachNode in result[eachDesign].design) {
+					result[eachDesign].design.eachNode = [];
+				}	
+			}
+			alert('DONE!');
+			saveResult(JSON.stringify(result),'x');
 		}
 	}
 	

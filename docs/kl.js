@@ -2,7 +2,7 @@
 /* KL utils*/
 
 //Get the D, I and E value for a nodes in the design
-function getNodeDIE(nodeName,design,netlist) {
+function getNodeDIE(nodeName,design,costTable) {
 	var i = 0, d = 0, e = 0;
 	// netlist.map( edge => { //For each node in the design, check all edges
 		// //Case 1 - This edge is not connected to this node
@@ -28,13 +28,13 @@ function getNodeDIE(nodeName,design,netlist) {
 		
 	// } );
 	
-	['groupA','groupB'].map( group => {
+	['groupA','groupB'].map( group => { //nodeName = self, node = dest
 		for (node in design[group]) {
 			if (node != nodeName) { //To find the I and E value, check all nodes in the design except this node
 				if ( getNodeGroup(design,nodeName) == getNodeGroup(design,node) ) //In same group
-					i += getCost(netlist,nodeName,node);
+					i += costTable[nodeName][node];
 				else
-					e += getCost(netlist,nodeName,node);
+					e += costTable[nodeName][node];
 			}
 		}
 		
@@ -81,7 +81,7 @@ function getNodeGroup(design,nodeName) {
 }*/
 
 //Get the sum of all edges that connects the given two nodes
-function getCost(netlist,nodeAName,nodeBName) {
+/*function getCost(netlist,nodeAName,nodeBName) {
 	return window.costAB[nodeAName][nodeBName];
 	cost = 0;
 	netlist.map( x => {
@@ -89,7 +89,7 @@ function getCost(netlist,nodeAName,nodeBName) {
 			cost += x.weight / (x.nodes.length-1);
 	} );
 	return cost;
-}
+}*/
 
 //Swap element in a design (Notice: JS function pass the copy of reference of object)
 function swap(design, nodeAName, nodeBName) {

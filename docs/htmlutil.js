@@ -20,3 +20,11 @@ function getRandom(start,end) {
 function lo(obj) {
 	return (JSON.parse(JSON.stringify(obj)));
 }
+
+//Prompt user to save result
+function saveResult(data,name) {
+	var downloader = document.createElement('a');
+	downloader.href = 'data:application/octet-stream;charset=utf-8;base64,' + btoa(data);
+	downloader.download = name + '_result.json';
+	downloader.click();
+}
