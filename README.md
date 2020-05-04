@@ -1,3 +1,7 @@
+```diff
+- This repo was used for my school project. It is deactived because I have finished that course.
+```
+
 # Kernighan–Lin algorithm
  Kernighan–Lin algorithm in JS and C
  
